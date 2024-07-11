@@ -1,28 +1,30 @@
 #!/usr/bin/python3
-"""
-Nettoie les archives obsolètes localement et sur les serveurs.
-"""
-
+# Fabric script that deletes out-of-date archives
+import os
 from fabric.api import *
 
-env.hosts = ["34.224.62.139", "100.25.119.231"] 
-env.user = "ubuntu"  # Utilisateur pour les connexions SSH
+env.hosts = ["54.90.1.233", "54.236.52.90"]
 
 
-def do_clean(number=0):  # Corrige E302 en ajoutantligne vide supplémentaire
+def do_clean(number=0):
+    """Delete out-of-date archives.
+
+    Args:
+        number (int): The number of archives to keep.
+
+    If number is 0 or 1, keeps only the most recent archive. If
+    number is 2, keeps the most and second-most recent archives,
+    etc.
     """
-    Garde seulement les 'number' archives les plus récentes.
-    """
-    number = int(number)
-    if number in [0, 1]:
-        number = 1  # Par défaut ou si 1, garder la plus récente
-    else:
-        number += 1  # Garder 'number' archives
+    number = 1 if int(number) == 0 else int(number)
 
-    # Nettoyer localement dans 'versions', divisé pour corriger E501
-    local("ls -t versions/web_static_* | tail -n +{} | "
-          "xargs rm -rf".format(number))
+    archives = sorted(os.listdir("versions"))
+    [archives.pop() for i in range(number)]
+    with lcd("versions"):
+        [local("rm ./{}".format(a)) for a in archives]
 
-    # Nettoyer sur les serveurs '/data/web_static/releases', divisé pour E501
-    run("ls -t /data/web_static/releases/web_static_* | tail -n +{} | "
-        "xargs rm -rf".format(number))
+    with cd("/data/web_static/releases"):
+        archives = run("ls -tr").split()
+        archives = [a for a in archives if "web_static_" in a]
+        [archives.pop() for i in range(number)]
+        [run("rm -rf ./{}".format(a)) for a in archives]
